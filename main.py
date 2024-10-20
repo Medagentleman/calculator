@@ -4,123 +4,112 @@ import re
 import math
 import logging
 
-# Настройка логирования. Логи будут выводиться в формате времени, уровня и сообщения.
+# Logging configuration. Logs will be output in the format of time, level, and message.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Создаем экземпляр бота с токеном
-bot = telebot.TeleBot('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+# Create a bot instance with the token
+bot = telebot.TeleBot('YOUR_TOKEN_HERE')
 
-# Словарь для хранения текущих математических выражений пользователей по их chat_id
+# Dictionary to store current mathematical expressions for users by their chat_id
 user_data = {}
 
-# Разрешены только цифры, математические операторы и определенные функции
-# Регулярное выражение для проверки допустимых символов в выражении
+# Only digits, mathematical operators, and certain functions are allowed
+# Regular expression to check for valid characters in the expression
 allowed_chars = re.compile(r'^[\d+\-*/.()%sqrt^ ]+$')
 
-
-# Функция для проверки допустимости выражения
-# Она возвращает True, если выражение соответствует регулярному выражению allowed_chars
+# Function to check if the expression is valid
+# It returns True if the expression matches the regular expression allowed_chars
 def is_valid_expression(expression):
     return bool(allowed_chars.match(expression))
 
-
-# Безопасное выполнение математического выражения
+# Safe evaluation of mathematical expression
 def safe_eval(expression, user_info):
     if is_valid_expression(expression):
         try:
-            # Замена символов для выполнения дополнительных функций
-            expression = expression.replace('^', '**')  # Замена символа '^' на '**' для возведения в степень
-            expression = expression.replace('sqrt',
-                                            'math.sqrt')  # Замена 'sqrt' на функцию math.sqrt для вычисления корня
+            # Replace symbols for additional functions
+            expression = expression.replace('^', '**')  # Replace '^' with '**' for exponentiation
+            expression = expression.replace('sqrt', 'math.sqrt')  # Replace 'sqrt' with math.sqrt for square root
 
-            # Логируем выражение перед выполнением для отслеживания
+            # Log the expression before evaluating to track user actions
             logging.info(f"User {user_info} evaluating expression: {expression}")
 
-            # Выполнение выражения с использованием eval, безопасно ограничив доступ только к математическим функциям
+            # Evaluate the expression using eval, limiting access only to math functions for safety
             result = str(eval(expression, {"__builtins__": None, "math": math}, {}))
 
-            # Логируем результат вычисления
+            # Log the result of the evaluation
             logging.info(f"User {user_info} result: {result}")
             return result
         except Exception as e:
-            # Логируем любые ошибки, которые могут возникнуть во время вычислений
+            # Log any errors that occur during evaluation
             logging.error(f"User {user_info} error evaluating expression: {expression}, Error: {e}")
-            return "Ошибка"  # Возвращаем сообщение об ошибке пользователю
+            return "Error"  # Return an error message to the user
     else:
-        # Логируем случаи, когда выражение не является допустимым
+        # Log invalid expressions
         logging.warning(f"User {user_info} invalid expression: {expression}")
-        return "Недопустимое выражение"
+        return "Invalid expression"
 
-
-# Функция для создания клавиатуры, имитирующей кнопки калькулятора
+# Function to create a keyboard simulating calculator buttons
 def create_keyboard():
-    keyboard = types.InlineKeyboardMarkup()  # Создаем объект клавиатуры
+    keyboard = types.InlineKeyboardMarkup()  # Create a keyboard object
 
-    # Определяем кнопки, которые будут отображаться на клавиатуре
+    # Define buttons to display on the keyboard
     buttons = [
-        ['7', '8', '9', '/'],  # Верхний ряд с цифрами и делением
-        ['4', '5', '6', '*'],  # Средний ряд с цифрами и умножением
-        ['1', '2', '3', '-'],  # Нижний ряд с цифрами и вычитанием
-        ['0', '.', '=', '+'],  # Ряд с нулем, точкой, равно и сложением
-        ['C', '(', ')', '%'],  # Ряд с кнопкой очистки, скобками и процентами
-        ['sqrt', '^', 'sin', 'cos', 'tan']  # Ряд с квадратным корнем, степенью и тригонометрическими функциями
+        ['7', '8', '9', '/'],  # Top row with numbers and division
+        ['4', '5', '6', '*'],  # Middle row with numbers and multiplication
+        ['1', '2', '3', '-'],  # Bottom row with numbers and subtraction
+        ['0', '.', '=', '+'],  # Row with zero, decimal point, equals, and addition
+        ['C', '(', ')', '%'],  # Row with clear button, parentheses, and percentage
+        ['sqrt', '^', 'sin', 'cos', 'tan']  # Row with square root, exponentiation, and trigonometric functions
     ]
 
-    # Преобразуем каждый ряд кнопок в объект кнопки и добавляем на клавиатуру
+    # Convert each row of buttons into an actual button object and add it to the keyboard
     for row in buttons:
         row_buttons = [types.InlineKeyboardButton(text=btn, callback_data=btn) for btn in row]
         keyboard.row(*row_buttons)
 
-    return keyboard  # Возвращаем созданную клавиатуру
+    return keyboard  # Return the created keyboard
 
-
-# Функция для получения информации о пользователе для логирования
+# Function to retrieve user information for logging
 def get_user_info(user):
-    username = user.username or "No username"  # Если у пользователя нет никнейма, используем текст "No username"
-    first_name = user.first_name or "No first name"  # Если у пользователя нет имени, используем текст "No first name"
-    user_id = user.id  # ID пользователя
+    username = user.username or "No username"  # Use "No username" if the user has no username
+    first_name = user.first_name or "No first name"  # Use "No first name" if the user has no first name
+    user_id = user.id  # Get the user ID
     return f"ID: {user_id}, Name: {first_name}, Username: @{username}"
 
-
-# Обрабатываем команду "/start", отправляем приветственное сообщение и создаем клавиатуру
+# Handle the "/start" command, send a welcome message, and create the calculator keyboard
 @bot.message_handler(commands=['start'])
 def start(message):
-    user_info = get_user_info(message.from_user)  # Получаем данные о пользователе
-    logging.info(f"User {user_info} started the bot.")  # Логируем событие старта
-    # Отправляем сообщение с приветствием и клавиатурой калькулятора
-    bot.send_message(message.chat.id, "Добро пожаловать в улучшенный калькулятор!", reply_markup=create_keyboard())
-    user_data[message.chat.id] = ""  # Инициализируем пустое выражение для пользователя
+    user_info = get_user_info(message.from_user)  # Get the user's info
+    logging.info(f"User {user_info} started the bot.")  # Log the start event
+    # Send a welcome message with the calculator keyboard
+    bot.send_message(message.chat.id, "Welcome to the enhanced calculator!", reply_markup=create_keyboard())
+    user_data[message.chat.id] = ""  # Initialize an empty expression for the user
 
-
-# Обрабатываем нажатия на кнопки калькулятора
+# Handle button presses on the calculator
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    chat_id = call.message.chat.id  # Получаем ID чата
-    user_info = get_user_info(call.from_user)  # Получаем информацию о пользователе
-    current_expression = user_data.get(chat_id, "")  # Получаем текущее выражение пользователя
+    chat_id = call.message.chat.id  # Get the chat ID
+    user_info = get_user_info(call.from_user)  # Get the user's information
+    current_expression = user_data.get(chat_id, "")  # Get the current expression of the user
 
-    # Обрабатываем нажатие кнопки "C" для очистки выражения
+    # Handle the "C" button press to clear the expression
     if call.data == "C":
-        logging.info(f"User {user_info} cleared the expression.")  # Логируем очистку выражения
-        user_data[chat_id] = ""  # Очищаем выражение
-        bot.edit_message_text("0", chat_id, call.message.id,
-                              reply_markup=create_keyboard())  # Обновляем текст сообщения на "0"
-
-    # Обрабатываем нажатие кнопки "=" для вычисления выражения
+        logging.info(f"User {user_info} cleared the expression.")  # Log the expression clear event
+        user_data[chat_id] = ""  # Clear the expression
+        bot.edit_message_text("0", chat_id, call.message.id, reply_markup=create_keyboard())  # Update the message text to "0"
+    
+    # Handle the "=" button press to evaluate the expression
     elif call.data == "=":
-        result = safe_eval(current_expression, user_info)  # Вызываем функцию безопасного вычисления
-        bot.edit_message_text(result, chat_id, call.message.id,
-                              reply_markup=create_keyboard())  # Отправляем результат вычисления
-        user_data[chat_id] = ""  # Очищаем выражение после вычисления
-
-    # Обрабатываем нажатия других кнопок (цифры и операторы)
+        result = safe_eval(current_expression, user_info)  # Call the safe evaluation function
+        bot.edit_message_text(result, chat_id, call.message.id, reply_markup=create_keyboard())  # Send the result of the evaluation
+        user_data[chat_id] = ""  # Clear the expression after the calculation
+    
+    # Handle other button presses (numbers and operators)
     else:
-        user_data[chat_id] = current_expression + call.data  # Добавляем нажатую кнопку к текущему выражению
-        logging.info(f"User {user_info} updated expression: {user_data[chat_id]}")  # Логируем обновленное выражение
-        bot.edit_message_text(user_data[chat_id], chat_id, call.message.id,
-                              reply_markup=create_keyboard())  # Обновляем текст сообщения
+        user_data[chat_id] = current_expression + call.data  # Append the pressed button to the current expression
+        logging.info(f"User {user_info} updated expression: {user_data[chat_id]}")  # Log the updated expression
+        bot.edit_message_text(user_data[chat_id], chat_id, call.message.id, reply_markup=create_keyboard())  # Update the message text
 
-
-# Запуск бота с постоянной проверкой входящих сообщений
-logging.info("Bot started. Waiting for messages...")  # Логируем старт бота
-bot.polling()  # Запускаем опрос API Telegram для получения новых сообщений
+# Start the bot and keep polling for new messages
+logging.info("Bot started. Waiting for messages...")  # Log the bot start
+bot.polling()  # Start polling the Telegram API for new messages
